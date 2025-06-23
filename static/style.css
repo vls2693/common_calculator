@@ -1,0 +1,121 @@
+html {
+    height: 100%;
+    font-family: 'Roboto', sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: vertical;
+    margin: 0px;
+    /*background: #c1bdba; */
+    height: 100%;
+}
+
+main {
+    margin-left: auto;
+    margin-right: auto;
+    margin: auto;
+    background:rgba(19, 35, 47,.9);
+    padding: 40px;
+    border-radius:$br;
+    box-shadow:0 4px 10px 4px rgba(19, 35, 47,.3);
+}
+
+h1 {
+    margin-top: 0px;
+    margin-bottom: 40px;
+    text-align: center;
+    color: white;
+}
+
+form {
+    margin-bottom: 30px;
+}
+
+fieldset {
+    display: flex;
+    flex-direction: row;
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-bottom: 15px;
+    border: none;
+    padding: 0px;
+}
+
+input {
+  font-size:22px;
+  display:block;
+  width:100%;
+  height:100%;
+  padding:5px 10px;
+  background:none;
+  background-image:none;
+  border:1px solid #a0b3b0;
+  color:white;
+  border-radius:0;
+  transition:border-color .25s ease, box-shadow .25s ease;
+}
+
+input:focus {
+    outline:0;
+    border:1px solid #1ab188;
+}
+
+.name {
+    margin-right: 20px;
+}
+
+.send {
+    margin-bottom: 15px;
+    background: #1ab188;
+    color: white;
+    border: none;
+}
+
+.send:hover {
+    filter: brightness(85%);
+}
+
+.remove {
+    margin-bottom: 15px;
+}
+
+.reset:focus {
+    border:1px solid #a0b3b0;
+}
+
+.reset:active {
+    border:1px solid #1ab188;
+}
+
+button {
+  font-size:22px;
+  display:block;
+  width:100%;
+  height:100%;
+  padding:5px 10px;
+  background:none;
+  background-image:none;
+  border:1px solid #a0b3b0;
+  color:white;
+  border-radius:0;
+  transition:border-color .25s ease, box-shadow .25s ease;
+}
+
+/* styles for results */
+
+h2 {
+    font-size: 20px;
+    color: white;
+}
+main {
+    color: white;
+}
+
+li {
+    list-style-type: none; /* Убираем маркеры */
+}
+ul {
+    margin-left: 0; /* Отступ слева в браузере IE и Opera */
+    padding-left: 0; /* Отступ слева в браузере Firefox, Safari, Chrome */
+}

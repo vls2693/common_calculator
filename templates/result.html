@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Result</title>
+    <link type="text/css" rel="stylesheet"
+        href="{{ url_for('static',
+              filename='style.css')}}" />
+    <link rel="shortcut icon" href="{{ url_for('static',
+              filename='favicon.ico')}}" type="image/x-icon">
+</head>
+    <body>
+        <main class="result-main">
+            <h1>Results</h1>
+            <h2>Who spent money:</h2>
+            <span>
+                {% for names in name_list %}
+                {% set name = names.split(';') %}
+                {{ name[0] }} - {{ name[1] }}<br>
+                {% endfor %}
+            </span>
+            <h2>Common spent sum:</h2>
+            <span>{{common_spent_sum}}</span>
+
+            <h2>An arithmetic average of spent:</h2>
+            <span>{{average_sum}}</span>
+			<br>
+            <h2>Who must pay:</h2>
+            <ul>
+                {% for debts in debt_list %}
+                {% set debt = debts.split(';') %}
+                <li>{{ debt[0] }} - {{ debt[1] }}</li>
+                {% endfor %}
+            </ul>
+            <h2>Who must be payed:</h2>
+            <ul>
+                {% for overpays in overpay_list %}
+                {% set overpay = overpays.split(';') %}
+                <li>{{ overpay[0] }} - {{ overpay[1] }}</li>
+                {% endfor %}
+            </ul>
+            <h2>Transaction list:</h2>
+            <ul>
+                {% for transactions in transaction_list %}
+                {% set transaction = transactions.split(';') %}
+                <li>{{ transaction[0] }} ---> {{ transaction[1] }} {{ transaction[2] }}</li>
+                {% endfor %}
+            </ul>
+			<br>
+            <br>
+			<a href="/">Come back to the previous page</a>
+        </main>
+    </body>
+</html>
