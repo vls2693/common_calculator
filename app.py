@@ -16,9 +16,6 @@ def my_form_post():
     return render_template('result.html', name_list=names, common_spent_sum=amount, average_sum=average, debt_list=debt,
                            overpay_list=overpay, transaction_list=transactions)
 
-@app.route('/test')
-def test_text():
-    return '<p>"It works"</p>'
 
 if __name__ == "__main__":
     app.run()
