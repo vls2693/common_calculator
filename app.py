@@ -18,7 +18,7 @@ def my_form_post():
 
 @app.route('/test')
 def test_text():
-    print("It works")
+    return '<p>"It works"</p>'
 
 if __name__ == "__main__":
     app.run()
