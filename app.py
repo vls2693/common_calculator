@@ -4,7 +4,7 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 
-@app.route("/")
+@app.route('/')
 def index():
     return render_template('index.html')
 
@@ -16,6 +16,9 @@ def my_form_post():
     return render_template('result.html', name_list=names, common_spent_sum=amount, average_sum=average, debt_list=debt,
                            overpay_list=overpay, transaction_list=transactions)
 
+@app.route('/test')
+def test_text():
+    print("It works")
 
 if __name__ == "__main__":
     app.run()
