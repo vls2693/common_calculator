@@ -9,9 +9,20 @@ def receiver(whole_dict):
     people = []
     common_sum = []
 
-    for i in range(0, int(len(whole_dict.getlist('name')))):
-        people.append(whole_dict.getlist('name')[i])
-        common_sum.append(int(whole_dict.getlist('sum')[i]))
+    names_list = whole_dict.getlist('name')
+    sum_list = whole_dict.getlist('sum')
+
+    for i in range(0, int(len(names_list))):
+        name = names_list[i]
+        sum_value = sum_list[i]
+
+        try:
+            sum_value_int = int(sum_value)
+        except:
+            raise ValueError(f"Некорректное значение суммы в позиции {i}: {sum_value}")
+
+        people.append(name)
+        common_sum.append(sum_value_int)
 
     amount = amount_counter(common_sum)
     average = average_counter(common_sum, amount)
