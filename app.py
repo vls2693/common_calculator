@@ -12,7 +12,10 @@ def index():
 @app.route('/', methods=['POST'])
 def my_form_post():
     whole_dict = request.form
-    names, amount, average, debt, overpay, transactions = receiver(whole_dict)
+    try:
+        names, amount, average, debt, overpay, transactions = receiver(whole_dict)
+    except ValueError as e:
+        return render_template('error.html', error_message=str(e)), 424
     return render_template('result.html', name_list=names, common_spent_sum=amount, average_sum=average, debt_list=debt,
                            overpay_list=overpay, transaction_list=transactions)
 
