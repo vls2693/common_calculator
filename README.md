@@ -13,33 +13,80 @@ python app.py
 
 Приложение будет доступно на `http://127.0.0.1:5000`.
 
-Проверить production-запуск локально можно так:
+## Деплой на PythonAnywhere
 
-```bash
-gunicorn app:app --bind 127.0.0.1:8000
-```
+Сайт: **https://vls2693.pythonanywhere.com**
 
-## Деплой на Heroku
+Автодеплой работает так:
 
-В репозитории уже подготовлены файлы для Heroku:
+1. Push в `main` запускает GitHub Actions.
+2. Сначала выполняются тесты.
+3. Если тесты прошли, workflow через официальный PythonAnywhere API создаёт временную Bash-консоль на сервере.
+4. Консоль делает `git fetch` + `git reset --hard origin/main`. Если `requirements.txt` изменился, зависимости обновляются.
+5. Веб-приложение перезагружается через API, временная консоль удаляется.
 
-- `Procfile` — запускает приложение через Gunicorn и слушает `$PORT`;
-- `.python-version` — фиксирует Python 3.14;
-- `gunicorn` добавлен в `requirements.txt`;
-- `.github/workflows/ci.yml` — запускает тесты на каждый push и pull request.
+У PythonAnywhere нет GitHub-интеграции как у Heroku, а на бесплатном плане нет SSH, поэтому используется API-токен. Токен хранится в GitHub Secrets и его можно отозвать в любой момент.
 
-### Первичная настройка
+### Одноразовая настройка
 
-1. Откройте приложение в [Heroku Dashboard](https://dashboard.heroku.com/) → вкладка **Deploy**.
-2. В блоке **Deployment method** выберите **GitHub** и авторизуйте Heroku в GitHub, если это ещё не сделано.
-3. Найдите репозиторий `vls2693/common_calculator` и нажмите **Connect**.
-4. В блоке **Automatic deploys** выберите ветку **main** и нажмите **Enable Automatic Deploys**.
-5. Включите опцию **Wait for CI to pass before deploy**, чтобы Heroku деплоил только после успешного прохождения GitHub Actions.
-6. Для первого деплоя нажмите **Deploy Branch** в блоке **Manual deploy** (или просто сделайте push в `main`).
+1. **Создайте API-токен.** PythonAnywhere → **Account** → **API Token** → **Generate**. Скопируйте токен.
+2. **Добавьте токен в GitHub.** Репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Имя: `PYTHONANYWHERE_API_TOKEN`.
+3. **Проверьте пути.** На PythonAnywhere откройте **Web** и запомните:
+   - **Source code** — каталог с кодом;
+   - **Virtualenv** — путь к виртуальному окружению.
 
-После этого каждый push в `main` будет запускать CI, а затем автоматически деплоиться на Heroku. Heroku API key при этом хранить в GitHub не нужно.
+   Значения по умолчанию в workflow: `/home/vls2693/common_calculator` и `/home/vls2693/.virtualenvs/common_calc`. Если у вас другие пути, создайте переменные репозитория (**Settings → Secrets and variables → Actions → Variables**): `PA_PROJECT_DIR` и `PA_VENV`. Дополнительно можно задать `PA_DOMAIN` и `PA_USERNAME`.
+4. **Подготовьте git-репозиторий на сервере.** Откройте Bash-консоль на PythonAnywhere и выполните (подставьте путь из **Source code**):
 
-> Для настройки нужны права администратора репозитория: Heroku создаёт service hook в GitHub.
+   ```bash
+   cd /home/vls2693/common_calculator
+   git init -q
+   git remote add origin https://github.com/vls2693/common_calculator.git 2>/dev/null || \
+     git remote set-url origin https://github.com/vls2693/common_calculator.git
+   git fetch --depth=1 origin main
+   git checkout -f -B main FETCH_HEAD
+   ```
+
+   Команда `git checkout -f` заменит файлы приложения в этом каталоге версией из GitHub.
+5. **Установите зависимости** в окружение из вкладки **Web**:
+
+   ```bash
+   /home/vls2693/.virtualenvs/common_calc/bin/pip install -r requirements.txt
+   ```
+
+   Если виртуального окружения нет, создайте его. Версия Python в окружении должна совпадать с версией на вкладке **Web**:
+
+   ```bash
+   python3 -m venv /home/vls2693/.virtualenvs/common_calc
+   /home/vls2693/.virtualenvs/common_calc/bin/pip install --upgrade pip
+   /home/vls2693/.virtualenvs/common_calc/bin/pip install -r requirements.txt
+   ```
+
+   После этого укажите этот путь в **Web → Virtualenv** и в переменной `PA_VENV`.
+6. **Настройте WSGI-файл.** На вкладке **Web** откройте ссылку **WSGI configuration file** и замените содержимое на:
+
+   ```python
+   import sys
+
+   path = "/home/vls2693/common_calculator"
+   if path not in sys.path:
+       sys.path.insert(0, path)
+
+   from wsgi import application
+   ```
+
+   Сохраните файл и нажмите **Reload**.
+7. **Проверьте сайт** по адресу https://vls2693.pythonanywhere.com. После этого каждый push в `main` будет деплоиться автоматически.
+
+### Ручной запуск деплоя
+
+GitHub → **Actions** → **CI** → **Run workflow**. Деплой выполнится только для ветки `main` и только после успешных тестов.
+
+### Ограничения бесплатного плана
+
+- 100 CPU-секунд в день. Поэтому зависимости переустанавливаются только при изменении `requirements.txt`.
+- Веб-приложение нужно периодически продлевать на вкладке **Web**.
+- SSH недоступен, поэтому используется API-токен.
 
 ## Возможности
 
