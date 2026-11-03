@@ -1,54 +1,112 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8"/>
-    <title>Result</title>
-    <link type="text/css" rel="stylesheet"
-        href="{{ url_for('static',
-              filename='style.css')}}" />
-    <link rel="shortcut icon" href="{{ url_for('static',
-              filename='favicon.ico')}}" type="image/x-icon">
-</head>
-    <body>
-        <main class="result-main">
-            <h1>Results</h1>
-            <h2>Who spent money:</h2>
-            <span>
-                {% for names in name_list %}
-                {% set name = names.split(';') %}
-                {{ name[0] }} - {{ name[1] }}<br>
-                {% endfor %}
-            </span>
-            <h2>Common spent sum:</h2>
-            <span>{{common_spent_sum}}</span>
+{% extends "base.html" %}
 
-            <h2>An arithmetic average of spent:</h2>
-            <span>{{average_sum}}</span>
-			<br>
-            <h2>Who must pay:</h2>
-            <ul>
-                {% for debts in debt_list %}
-                {% set debt = debts.split(';') %}
-                <li>{{ debt[0] }} - {{ debt[1] }}</li>
+{% block title %}Результат расчёта — Общий калькулятор{% endblock %}
+
+{% block content %}
+<section class="result">
+    <header class="result-header">
+        <div>
+            <p class="eyebrow">Шаг 2 из 2</p>
+            <h1>Расчёт готов</h1>
+            <p class="lead">Вот сколько потратил каждый и какие переводы нужно сделать, чтобы всё было по-честному.</p>
+        </div>
+        <a class="btn btn-ghost header-action" href="{{ url_for('index') }}">Новый расчёт</a>
+    </header>
+
+    <div class="stats">
+        <article class="stat stat--accent">
+            <span class="stat-label">Всего потрачено</span>
+            <strong>{{ total|rub }}</strong>
+        </article>
+        <article class="stat">
+            <span class="stat-label">В среднем на человека</span>
+            <strong>{{ average|rub }}</strong>
+        </article>
+        <article class="stat">
+            <span class="stat-label">Участников</span>
+            <strong>{{ participants|length }}</strong>
+        </article>
+    </div>
+
+    <div class="result-grid">
+        <section class="card card-wide">
+            <h2>Кому и сколько перевести</h2>
+            {% if transactions %}
+            <ul class="transaction-list">
+                {% for item in transactions %}
+                <li class="transaction">
+                    <span class="transfer">
+                        <span class="transfer-person">{{ item.from }}</span>
+                        <span class="transfer-arrow" aria-label="переводит">→</span>
+                        <span class="transfer-person">{{ item.to }}</span>
+                    </span>
+                    <strong class="amount">{{ item.amount|rub }}</strong>
+                </li>
                 {% endfor %}
             </ul>
-            <h2>Who must be payed:</h2>
-            <ul>
-                {% for overpays in overpay_list %}
-                {% set overpay = overpays.split(';') %}
-                <li>{{ overpay[0] }} - {{ overpay[1] }}</li>
+            {% else %}
+            <div class="empty-state">
+                <span class="empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                </span>
+                <p>Переводы не нужны — все потратили поровну.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h2>Кто сколько потратил</h2>
+            <ul class="person-list">
+                {% for person in participants %}
+                <li>
+                    <span class="avatar" aria-hidden="true">{{ person.name[:1]|upper }}</span>
+                    <span class="person-name">{{ person.name }}</span>
+                    <span class="amount">{{ person.amount|rub }}</span>
+                </li>
                 {% endfor %}
             </ul>
-            <h2>Transaction list:</h2>
-            <ul>
-                {% for transactions in transaction_list %}
-                {% set transaction = transactions.split(';') %}
-                <li>{{ transaction[0] }} ---> {{ transaction[1] }} {{ transaction[2] }}</li>
+        </section>
+
+        <section class="card">
+            <h2>Кто должен доплатить</h2>
+            {% if debts %}
+            <p class="card-note">Эти участники потратили меньше среднего.</p>
+            <ul class="balance-list balance-list--debt">
+                {% for item in debts %}
+                <li>
+                    <span class="person-name">{{ item.name }}</span>
+                    <span class="amount">{{ item.amount|rub }}</span>
+                </li>
                 {% endfor %}
             </ul>
-			<br>
-            <br>
-			<a href="/">Come back to the previous page</a>
-        </main>
-    </body>
-</html>
+            {% else %}
+            <p class="muted-text">Никто: все потратили достаточно.</p>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h2>Кому должны вернуть</h2>
+            {% if overpays %}
+            <p class="card-note">Эти участники потратили больше среднего.</p>
+            <ul class="balance-list balance-list--credit">
+                {% for item in overpays %}
+                <li>
+                    <span class="person-name">{{ item.name }}</span>
+                    <span class="amount">{{ item.amount|rub }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="muted-text">Никому: переплат нет.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <div class="result-actions">
+        <a class="btn btn-primary" href="{{ url_for('index') }}">Рассчитать ещё раз</a>
+        <button type="button" class="btn btn-ghost" onclick="window.print()">Распечатать</button>
+    </div>
+</section>
+{% endblock %}

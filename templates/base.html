@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Общий калькулятор — честно разделите общие расходы и узнайте, кто кому должен.">
+    <meta name="theme-color" content="#f3f7f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b1412" media="(prefers-color-scheme: dark)">
+    <title>{% block title %}Общий калькулятор{% endblock %}</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page">
+        <header class="site-header">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="3" width="16" height="18" rx="3"></rect>
+                        <path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h8"></path>
+                    </svg>
+                </span>
+                <span class="brand-text">
+                    <strong>Общий калькулятор</strong>
+                    <small>Делим расходы честно</small>
+                </span>
+            </a>
+            <span class="header-badge">Без регистрации</span>
+        </header>
+
+        <main class="page-main">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="site-footer">
+            <span>Общий калькулятор</span>
+            <span>Считаем в копейках — без расхождений</span>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

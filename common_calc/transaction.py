@@ -1,29 +1,28 @@
 def transaction(plus_people, plus_sum, minus_people, minus_sum):
-    plus_people = plus_people
-    plus_sum = plus_sum
-    minus_people = minus_people
-    minus_sum = minus_sum
+    """Подбирает минимальный набор переводов от должников к переплатившим."""
+    # Работаем в копейках и на копиях, чтобы не менять исходные списки
+    # и не накапливать ошибку округления float.
+    plus_left = [int(round(value * 100)) for value in plus_sum]
+    minus_left = [int(round(value * 100)) for value in minus_sum]
+
     transaction_minus = []
     transaction_sum = []
     transaction_plus = []
-    for i in range(0, len(minus_sum)):
-        for k in range(0, len(plus_sum)):
-            if plus_sum[k] <= 0:
+
+    for debtor_index, debt in enumerate(minus_left):
+        for receiver_index, overpay in enumerate(plus_left):
+            if debt <= 0:
+                break
+            if overpay <= 0:
                 continue
-            elif minus_sum[i] <= 0:
-                continue
-            else:
-                if minus_sum[i] < plus_sum[k]:
-                    transaction_minus.append(minus_people[i])
-                    transaction_sum.append(minus_sum[i])
-                    transaction_plus.append(plus_people[k])
-                    plus_sum[k] = float('{:.2f}'.format(plus_sum[k] - minus_sum[i]))
-                    minus_sum[i] = 0
-                elif minus_sum[i] >= plus_sum[k]:
-                    transaction_minus.append(minus_people[i])
-                    transaction_sum.append(plus_sum[k])
-                    transaction_plus.append(plus_people[k])
-                    minus_sum[i] = minus_sum[i] - plus_sum[k]
-                    plus_sum[k] = 0
+
+            amount = min(debt, overpay)
+            transaction_minus.append(minus_people[debtor_index])
+            transaction_plus.append(plus_people[receiver_index])
+            transaction_sum.append(amount / 100)
+
+            minus_left[debtor_index] -= amount
+            plus_left[receiver_index] -= amount
+            debt -= amount
 
     return transaction_minus, transaction_sum, transaction_plus

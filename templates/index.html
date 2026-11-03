@@ -1,34 +1,113 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8"/>
-        <title>Calculator</title>
-        <link type="text/css" rel="stylesheet"
-            href="{{ url_for('static',
-                  filename='style.css')}}" />
-        <link rel="shortcut icon" href="{{ url_for('static',
-                  filename='favicon.ico')}}" type="image/x-icon">
-    </head>
-    <body>
-        <main>
-            <form class="form" method="POST">
-                <h1>Fill the form</h1>
-                <div class="bunch">
-                    <fieldset>
-                        <input class="name" name="name" required placeholder="Name" type="text">
-                        <input class="sum" name="sum" required placeholder="Sum" type="number">
-                    </fieldset>
-                    <fieldset>
-                        <input class="name" name="name" required placeholder="Name" type="text">
-                        <input class="sum" name="sum" required placeholder="Sum" type="number">
-                    </fieldset>
-                </div>
-                <input class="send" type="submit" value="Send">
-                <input class="reset" type="reset" value="Reset">
-            </form>
-            <button id="add" class="send" onclick="addString()" value="Add">Add</button>
-            <button id="remove" class="remove" onclick="removeString()" value="Remove">Remove</button>
-        </main>
-        <script src="{{ url_for('static', filename = 'script.js') }}"></script>
-    </body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Разделить расходы — Общий калькулятор{% endblock %}
+
+{% macro person_row(index, name_value='', sum_value='') %}
+<div class="person-row">
+    <div class="field field-name">
+        <label for="name-{{ index }}">Имя</label>
+        <input id="name-{{ index }}" name="name" type="text" value="{{ name_value }}"
+               placeholder="Например, Анна" maxlength="60" autocomplete="off" required>
+    </div>
+    <div class="field field-amount">
+        <label for="sum-{{ index }}">Потрачено</label>
+        <div class="input-wrap">
+            <input id="sum-{{ index }}" name="sum" type="text" inputmode="decimal"
+                   value="{{ sum_value }}" placeholder="0" maxlength="20"
+                   autocomplete="off" required
+                   title="Только цифры. Дробная часть — через запятую или точку.">
+            <span class="input-suffix" aria-hidden="true">₽</span>
+        </div>
+    </div>
+    <button type="button" class="icon-button remove-row" aria-label="Удалить участника"
+            title="Удалить участника">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+        </svg>
+    </button>
+</div>
+{% endmacro %}
+
+{% block content %}
+<section class="card form-card">
+    <div class="card-heading">
+        <p class="eyebrow">Шаг 1 из 2</p>
+        <h1>Разделите общие расходы</h1>
+        <p class="lead">Добавьте участников и укажите, сколько каждый уже потратил. Калькулятор посчитает, кто кому должен перевести деньги.</p>
+    </div>
+
+    <form id="expense-form" method="post" autocomplete="off">
+        {% if form_error %}
+        <div class="alert" role="alert" tabindex="-1" data-error-field="{{ error_field or '' }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 8v5M12 16.5v.01"></path>
+            </svg>
+            <span>{{ form_error }}</span>
+        </div>
+        {% endif %}
+
+        <div class="people" id="people">
+            {% for row in rows %}
+                {{ person_row(loop.index, row.name, row.sum) }}
+            {% endfor %}
+        </div>
+
+        <template id="person-template">
+            {{ person_row(0) }}
+        </template>
+
+        <button type="button" class="add-row" id="add-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            Добавить участника
+        </button>
+
+        <div class="form-summary">
+            <div>
+                <span class="summary-label">Участников</span>
+                <strong id="people-count">{{ rows|length }}</strong>
+            </div>
+            <div>
+                <span class="summary-label">Итого потрачено</span>
+                <strong id="total-amount">0&nbsp;₽</strong>
+            </div>
+        </div>
+
+        <div class="form-error" id="form-error" role="alert" hidden></div>
+
+        <div class="actions">
+            <button type="submit" class="btn btn-primary">
+                <span class="btn-label">Рассчитать</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14M13 6l6 6-6 6"></path>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-ghost" id="reset-form">Очистить</button>
+        </div>
+    </form>
+</section>
+
+<section class="how-it-works" aria-labelledby="how-title">
+    <h2 id="how-title">Как это работает</h2>
+    <ol class="steps">
+        <li>
+            <span class="step-number">1</span>
+            <p>Добавьте всех, кто участвовал в общих расходах.</p>
+        </li>
+        <li>
+            <span class="step-number">2</span>
+            <p>Укажите, сколько денег уже потратил каждый.</p>
+        </li>
+        <li>
+            <span class="step-number">3</span>
+            <p>Получите готовый список переводов без лишних расчётов.</p>
+        </li>
+    </ol>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='script.js') }}" defer></script>
+{% endblock %}

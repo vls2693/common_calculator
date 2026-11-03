@@ -1,28 +1,27 @@
-def sorting(people, common_sum, average):
+def sorting(people, common_sum, amount):
+    """Делит участников на переплативших и недоплативших.
+
+    Расчёт идёт в копейках, поэтому сумма долгов всегда точно совпадает
+    с суммой переплат (без «потерянной» копейки из-за округления).
+    """
+    total_cents = int(round(amount * 100))
+    people_count = len(people)
+    base_share, extra_cent = divmod(total_cents, people_count)
+
     plus_people = []
-    minus_people = []
     plus_sum = []
+    minus_people = []
     minus_sum = []
-    plus_people_rep = []
-    minus_people_rep = []
-    plus_sum_rep = []
-    minus_sum_rep = []
-    for i in range(0, len(common_sum)):
-        if common_sum[i] > average:
-            m = float('{:.2f}'.format(common_sum[i] - average))
-            plus_sum.append(m)
-            plus_people.append(people[i])
-            plus_sum_rep.append(m)
-            plus_people_rep.append(people[i])
-        elif common_sum[i] < average:
-            n = float('{:.2f}'.format(average - common_sum[i]))
-            minus_sum.append(n)
-            minus_people.append(people[i])
-            minus_sum_rep.append(n)
-            minus_people_rep.append(people[i])
-        else:
-            continue
-    return plus_people, plus_sum, minus_people, minus_sum, plus_people_rep, \
-        plus_sum_rep, minus_people_rep, minus_sum_rep
-# добавить сортировку списков, добавить классы, примеры по ссылке
-# https://tproger.ru/translations/python-sorting
+
+    for index, (name, spent) in enumerate(zip(people, common_sum)):
+        share = base_share + (1 if index < extra_cent else 0)
+        balance = int(round(spent * 100)) - share
+
+        if balance > 0:
+            plus_people.append(name)
+            plus_sum.append(balance / 100)
+        elif balance < 0:
+            minus_people.append(name)
+            minus_sum.append(-balance / 100)
+
+    return plus_people, plus_sum, minus_people, minus_sum

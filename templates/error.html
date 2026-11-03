@@ -1,10 +1,18 @@
-<!doctype html>
-<html>
-<head>
-    <title>Ошибка</title>
-</head>
-<body>
-    <h1>Ошибка при обработке данных</h1>
-    <p>{{ error_message }}</p>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}{{ error_title }} — Общий калькулятор{% endblock %}
+
+{% block content %}
+<section class="card error-card">
+    <span class="error-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 8v5M12 16.5v.01"></path>
+        </svg>
+    </span>
+    <p class="eyebrow">Ошибка {{ status_code }}</p>
+    <h1>{{ error_title }}</h1>
+    <p class="error-message">{{ error_message }}</p>
+    <a class="btn btn-primary" href="{{ url_for('index') }}">Вернуться к калькулятору</a>
+</section>
+{% endblock %}
