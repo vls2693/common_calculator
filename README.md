@@ -13,6 +13,34 @@ python app.py
 
 Приложение будет доступно на `http://127.0.0.1:5000`.
 
+Проверить production-запуск локально можно так:
+
+```bash
+gunicorn app:app --bind 127.0.0.1:8000
+```
+
+## Деплой на Heroku
+
+В репозитории уже подготовлены файлы для Heroku:
+
+- `Procfile` — запускает приложение через Gunicorn и слушает `$PORT`;
+- `.python-version` — фиксирует Python 3.14;
+- `gunicorn` добавлен в `requirements.txt`;
+- `.github/workflows/ci.yml` — запускает тесты на каждый push и pull request.
+
+### Первичная настройка
+
+1. Откройте приложение в [Heroku Dashboard](https://dashboard.heroku.com/) → вкладка **Deploy**.
+2. В блоке **Deployment method** выберите **GitHub** и авторизуйте Heroku в GitHub, если это ещё не сделано.
+3. Найдите репозиторий `vls2693/common_calculator` и нажмите **Connect**.
+4. В блоке **Automatic deploys** выберите ветку **main** и нажмите **Enable Automatic Deploys**.
+5. Включите опцию **Wait for CI to pass before deploy**, чтобы Heroku деплоил только после успешного прохождения GitHub Actions.
+6. Для первого деплоя нажмите **Deploy Branch** в блоке **Manual deploy** (или просто сделайте push в `main`).
+
+После этого каждый push в `main` будет запускать CI, а затем автоматически деплоиться на Heroku. Heroku API key при этом хранить в GitHub не нужно.
+
+> Для настройки нужны права администратора репозитория: Heroku создаёт service hook в GitHub.
+
 ## Возможности
 
 - Добавление и удаление участников прямо в форме.
