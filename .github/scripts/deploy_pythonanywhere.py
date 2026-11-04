@@ -51,14 +51,45 @@ def api_url(host, username, path):
 
 
 def api_request(method, url, token, payload=None, timeout=30):
+    """Выполняет запрос к API и возвращает (http_status, тело_ответа)."""
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("Authorization", f"Token {token}")
+    request.add_header("Accept", "application/json")
+    request.add_header("Accept-Encoding", "identity")
     if data is not None:
         request.add_header("Content-Type", "application/json")
 
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.read().decode("utf-8", "replace")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8", "replace")
+            return response.status, body
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode("utf-8", "replace")
+
+
+def parse_json(body, context):
+    """Разбирает JSON и показывает тело ответа, если формат неожиданный."""
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as error:
+        snippet = body.strip()[:500] or "<пустой ответ>"
+        raise RuntimeError(
+            f"{context}: API вернул не JSON ({error}). Ответ: {snippet!r}"
+        ) from error
+
+
+def check_token(host, username, token):
+    """Проверяет токен дешёвым запросом, чтобы ошибка была понятной."""
+    status, body = api_request(
+        "GET", api_url(host, username, "webapps/"), token
+    )
+    if status >= 400:
+        raise RuntimeError(
+            f"PythonAnywhere API отклонил токен: HTTP {status}. "
+            f"Проверьте секрет PYTHONANYWHERE_API_TOKEN. Ответ: {body[:300]!r}"
+        )
+    return parse_json(body, "Список веб-приложений")
 
 
 def build_command(
@@ -120,31 +151,88 @@ def build_command(
     )
 
 
-def create_console(host, username, token, project_dir):
-    body = api_request(
+def get_or_create_console(host, username, token, project_dir):
+    """Возвращает (id консоли, создана_ли_нами).
+
+    Сначала пытаемся переиспользовать существующую bash-консоль: на бесплатном
+    плане их не больше двух, а создание новой через API не всегда возвращает
+    тело ответа. Если консолей нет — создаём свою и потом удаляем.
+    """
+    status, body = api_request(
+        "GET", api_url(host, username, "consoles/"), token
+    )
+    if status < 400 and body.strip():
+        try:
+            consoles = json.loads(body)
+        except json.JSONDecodeError:
+            consoles = []
+        if isinstance(consoles, list):
+            for console in consoles:
+                if not isinstance(console, dict):
+                    continue
+                if console.get("executable") not in ("bash", "sh"):
+                    continue
+                console_id = console.get("id")
+                if console_id is not None:
+                    print(f"Использую существующую консоль {console_id}.")
+                    return console_id, False
+
+    status, body = api_request(
         "POST",
         api_url(host, username, "consoles/"),
         token,
         {"executable": "bash", "working_directory": project_dir},
     )
-    data = json.loads(body)
-    console_id = data.get("id")
+    if status >= 400:
+        raise RuntimeError(
+            f"Не удалось создать консоль: HTTP {status}. Ответ: {body[:300]!r}"
+        )
+
+    console_id = None
+    if body.strip():
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            console_id = data.get("id")
     if console_id is None:
-        raise RuntimeError(f"PythonAnywhere не вернул id консоли: {body}")
-    return console_id
+        # Некоторые версии API отвечают на создание пустым телом —
+        # тогда id берём из списка консолей.
+        status, body = api_request(
+            "GET", api_url(host, username, "consoles/"), token
+        )
+        data = parse_json(body, "Список консолей после создания")
+        if isinstance(data, list) and data:
+            console_id = max(
+                (c.get("id") for c in data if isinstance(c, dict)),
+                key=lambda value: value if isinstance(value, int) else -1,
+                default=None,
+            )
+    if console_id is None:
+        raise RuntimeError(
+            f"PythonAnywhere не вернул id консоли: {body[:300]!r}"
+        )
+    print(f"Создана временная консоль {console_id}.")
+    return console_id, True
 
 
 def send_input(host, username, token, console_id, command):
-    api_request(
+    status, body = api_request(
         "POST",
         api_url(host, username, f"consoles/{console_id}/send_input/"),
         token,
         {"input": command + "\n"},
     )
+    if status >= 400:
+        raise RuntimeError(
+            f"Не удалось отправить команду в консоль: HTTP {status}. "
+            f"Ответ: {body[:300]!r}"
+        )
 
 
 def latest_output(host, username, token, console_id):
-    body = api_request(
+    status, body = api_request(
         "GET",
         api_url(host, username, f"consoles/{console_id}/get_latest_output/"),
         token,
@@ -176,17 +264,19 @@ def run_deploy(
         project_dir, venv, username, domain, host, repo_url
     )
     console_id = None
+    console_created = False
 
     try:
-        console_id = create_console(host, username, token, project_dir)
-        print(f"Создана временная консоль {console_id}.")
+        check_token(host, username, token)
+        console_id, console_created = get_or_create_console(
+            host, username, token, project_dir
+        )
 
-        # Консоли нужно мгновение, чтобы запуститься после создания.
         for attempt in range(1, CONSOLE_START_ATTEMPTS + 1):
             try:
                 send_input(host, username, token, console_id, command)
                 break
-            except urllib.error.HTTPError:
+            except Exception:
                 if attempt == CONSOLE_START_ATTEMPTS:
                     raise
                 time.sleep(3)
@@ -224,7 +314,7 @@ def run_deploy(
         print(f"::error::Не удалось выполнить деплой: {error}")
         return 1
     finally:
-        if console_id is not None:
+        if console_id is not None and console_created:
             delete_console(host, username, token, console_id)
 
 
