@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.10"
           cache: pip
 
       - name: Install dependencies
@@ -53,5 +53,5 @@ jobs:
           PA_USERNAME: ${{ vars.PA_USERNAME || 'vls2693' }}
           PA_DOMAIN: ${{ vars.PA_DOMAIN || 'vls2693.pythonanywhere.com' }}
           PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR || '/home/vls2693/common_calculator' }}
-          PA_VENV: ${{ vars.PA_VENV || '/home/vls2693/.virtualenvs/common_calc' }}
+          PA_VENV: ${{ vars.PA_VENV || '/home/vls2693/.virtualenvs/myenv' }}
         run: python3 .github/scripts/deploy_pythonanywhere.py

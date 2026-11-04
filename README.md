@@ -13,6 +13,12 @@ python app.py
 
 Приложение будет доступно на `http://127.0.0.1:5000`.
 
+Если вместо приложения открывается ошибка `403 Forbidden`, скорее всего порт 5000 занят AirPlay Receiver (macOS) и Flask не смог запуститься — в логе будет `Address already in use`. Отключите AirPlay Receiver в **System Settings → General → AirDrop & Handoff** или запустите приложение на другом порту:
+
+```bash
+flask --app app run --port 5001
+```
+
 ## Деплой на PythonAnywhere
 
 Сайт: **https://vls2693.pythonanywhere.com**
@@ -22,7 +28,7 @@ python app.py
 1. Push в `main` запускает GitHub Actions.
 2. Сначала выполняются тесты.
 3. Если тесты прошли, workflow через официальный PythonAnywhere API создаёт временную Bash-консоль на сервере.
-4. Консоль делает `git fetch` + `git reset --hard origin/main`. Если `requirements.txt` изменился, зависимости обновляются.
+4. Если каталог ещё не git-репозиторий, он инициализируется автоматически. Затем `git fetch` + `git reset --hard FETCH_HEAD`. Если `requirements.txt` изменился, зависимости обновляются.
 5. Веб-приложение перезагружается через API, временная консоль удаляется.
 
 У PythonAnywhere нет GitHub-интеграции как у Heroku, а на бесплатном плане нет SSH, поэтому используется API-токен. Токен хранится в GitHub Secrets и его можно отозвать в любой момент.
@@ -31,39 +37,14 @@ python app.py
 
 1. **Создайте API-токен.** PythonAnywhere → **Account** → **API Token** → **Generate**. Скопируйте токен.
 2. **Добавьте токен в GitHub.** Репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Имя: `PYTHONANYWHERE_API_TOKEN`.
-3. **Проверьте пути.** На PythonAnywhere откройте **Web** и запомните:
-   - **Source code** — каталог с кодом;
-   - **Virtualenv** — путь к виртуальному окружению.
+3. **Проверьте пути.** На PythonAnywhere откройте **Web** и сверьте:
+   - **Source code** — `/home/vls2693/common_calculator`;
+   - **Virtualenv** — `/home/vls2693/.virtualenvs/myenv`;
+   - **Python version** — 3.10.
 
-   Значения по умолчанию в workflow: `/home/vls2693/common_calculator` и `/home/vls2693/.virtualenvs/common_calc`. Если у вас другие пути, создайте переменные репозитория (**Settings → Secrets and variables → Actions → Variables**): `PA_PROJECT_DIR` и `PA_VENV`. Дополнительно можно задать `PA_DOMAIN` и `PA_USERNAME`.
-4. **Подготовьте git-репозиторий на сервере.** Откройте Bash-консоль на PythonAnywhere и выполните (подставьте путь из **Source code**):
-
-   ```bash
-   cd /home/vls2693/common_calculator
-   git init -q
-   git remote add origin https://github.com/vls2693/common_calculator.git 2>/dev/null || \
-     git remote set-url origin https://github.com/vls2693/common_calculator.git
-   git fetch --depth=1 origin main
-   git checkout -f -B main FETCH_HEAD
-   ```
-
-   Команда `git checkout -f` заменит файлы приложения в этом каталоге версией из GitHub.
-5. **Установите зависимости** в окружение из вкладки **Web**:
-
-   ```bash
-   /home/vls2693/.virtualenvs/common_calc/bin/pip install -r requirements.txt
-   ```
-
-   Если виртуального окружения нет, создайте его. Версия Python в окружении должна совпадать с версией на вкладке **Web**:
-
-   ```bash
-   python3 -m venv /home/vls2693/.virtualenvs/common_calc
-   /home/vls2693/.virtualenvs/common_calc/bin/pip install --upgrade pip
-   /home/vls2693/.virtualenvs/common_calc/bin/pip install -r requirements.txt
-   ```
-
-   После этого укажите этот путь в **Web → Virtualenv** и в переменной `PA_VENV`.
-6. **Настройте WSGI-файл.** На вкладке **Web** откройте ссылку **WSGI configuration file** и замените содержимое на:
+   Это значения по умолчанию в workflow и в скрипте деплоя. Если у вас другие пути, создайте переменные репозитория (**Settings → Secrets and variables → Actions → Variables**): `PA_PROJECT_DIR` и `PA_VENV`. Дополнительно можно задать `PA_DOMAIN`, `PA_USERNAME` и `PA_REPO_URL`.
+4. **Первый деплой подготовит git сам.** Вручную ничего создавать не нужно: если в каталоге из **Source code** ещё нет git-репозитория, скрипт выполнит `git init`, добавит remote, скачает `main` и сделает `git reset --hard`. Единственное требование — в каталоге уже лежит `app.py` (это защита от деплоя не туда), а файлы приложения будут заменены версией из GitHub.
+5. **Проверьте WSGI-файл.** Если сайт уже открывался со старой версией, скорее всего всё настроено. Иначе на вкладке **Web** откройте ссылку **WSGI configuration file** и приведите содержимое к виду:
 
    ```python
    import sys
@@ -75,8 +56,8 @@ python app.py
    from wsgi import application
    ```
 
-   Сохраните файл и нажмите **Reload**.
-7. **Проверьте сайт** по адресу https://vls2693.pythonanywhere.com. После этого каждый push в `main` будет деплоиться автоматически.
+   Сохраните файл. Зависимости в `/home/vls2693/.virtualenvs/myenv` первый деплой установит сам, потому что `requirements.txt` изменился.
+6. **Запустите деплой.** GitHub → **Actions** → **CI** → **Run workflow** (ветка `main`). Дождитесь зелёного джоба **Deploy to PythonAnywhere** и откройте https://vls2693.pythonanywhere.com. После этого каждый push в `main` будет деплоиться автоматически.
 
 ### Ручной запуск деплоя
 

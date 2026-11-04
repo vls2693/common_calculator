@@ -15,7 +15,11 @@
     PA_DOMAIN      — домен веб-приложения;
     PA_PROJECT_DIR — каталог с кодом на сервере;
     PA_VENV        — путь к virtualenv на сервере;
-    PA_HOST        — www.pythonanywhere.com (US) или eu.pythonanywhere.com (EU).
+    PA_HOST        — www.pythonanywhere.com (US) или eu.pythonanywhere.com (EU);
+    PA_REPO_URL    — URL репозитория для git fetch.
+
+Если каталог проекта ещё не является git-репозиторием, скрипт инициализирует
+его сам. Каталог должен содержать app.py — это защита от деплоя не туда.
 """
 
 import json
@@ -29,6 +33,7 @@ import urllib.request
 DEFAULT_USERNAME = "vls2693"
 DEFAULT_DOMAIN = "vls2693.pythonanywhere.com"
 DEFAULT_HOST = "www.pythonanywhere.com"
+DEFAULT_REPO_URL = "https://github.com/vls2693/common_calculator.git"
 
 POLL_INTERVAL_SECONDS = 5
 CONSOLE_START_ATTEMPTS = 3
@@ -56,22 +61,33 @@ def api_request(method, url, token, payload=None, timeout=30):
         return response.read().decode("utf-8", "replace")
 
 
-def build_command(project_dir, venv, username, domain, host=DEFAULT_HOST):
+def build_command(
+    project_dir, venv, username, domain, host=DEFAULT_HOST, repo_url=DEFAULT_REPO_URL
+):
     """Собирает shell-команду, которая выполнится в консоли на сервере."""
     quote = shlex.quote
     reload_url = api_url(host, username, f"webapps/{domain}/reload/")
     wsgi_file = f"/var/www/{domain.replace('.', '_')}_wsgi.py"
     pip = f"{venv}/bin/pip"
+    remote_url = quote(repo_url)
 
     return "\n".join(
         [
             "set -e",
             f"trap 'echo \"{ERROR_MARKER}: command failed\"' ERR",
             f"cd {quote(project_dir)}",
+            "if [ ! -d .git ]; then",
             (
-                'if [ ! -d .git ]; then '
-                f'echo "{ERROR_MARKER}: {project_dir} is not a git repository"; '
+                '  if [ ! -f app.py ]; then '
+                f'echo "{ERROR_MARKER}: {project_dir} is not the project directory"; '
                 "exit 1; fi"
+            ),
+            "  git init -q",
+            "fi",
+            (
+                "git remote get-url origin > /dev/null 2>&1 "
+                f"&& git remote set-url origin {remote_url} "
+                f"|| git remote add origin {remote_url}"
             ),
             "OLD_REV=$(git rev-parse HEAD 2>/dev/null || true)",
             "git fetch --depth=1 origin main",
@@ -153,8 +169,12 @@ def delete_console(host, username, token, console_id):
         print(f"Не удалось удалить временную консоль {console_id}: {error}")
 
 
-def run_deploy(token, username, domain, project_dir, venv, host):
-    command = build_command(project_dir, venv, username, domain, host)
+def run_deploy(
+    token, username, domain, project_dir, venv, host, repo_url=DEFAULT_REPO_URL
+):
+    command = build_command(
+        project_dir, venv, username, domain, host, repo_url
+    )
     console_id = None
 
     try:
@@ -212,11 +232,12 @@ def main():
     username = env("PA_USERNAME", DEFAULT_USERNAME)
     domain = env("PA_DOMAIN", DEFAULT_DOMAIN)
     host = env("PA_HOST", DEFAULT_HOST)
+    repo_url = env("PA_REPO_URL", DEFAULT_REPO_URL)
     project_dir = env("PA_PROJECT_DIR", f"/home/{username}/common_calculator")
-    venv = env("PA_VENV", f"/home/{username}/.virtualenvs/common_calc")
+    venv = env("PA_VENV", f"/home/{username}/.virtualenvs/myenv")
 
     if "--print-command" in sys.argv:
-        print(build_command(project_dir, venv, username, domain))
+        print(build_command(project_dir, venv, username, domain, host, repo_url))
         return 0
 
     token = env("PYTHONANYWHERE_API_TOKEN")
@@ -232,7 +253,9 @@ def main():
         return 0
 
     print(f"Деплой в {domain}: {project_dir}")
-    return run_deploy(token, username, domain, project_dir, venv, host)
+    return run_deploy(
+        token, username, domain, project_dir, venv, host, repo_url
+    )
 
 
 if __name__ == "__main__":
