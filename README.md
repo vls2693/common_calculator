@@ -48,6 +48,7 @@ flask --app app run --port 5001
 2. **Подготовьте код на сервере.** PythonAnywhere → **Consoles** → **Bash**. Выполните команды, подставив свой токен:
 
    ```bash
+   export PATH="/usr/bin:/bin:$PATH"
    cd /home/vls2693/common_calculator
    git init -q
    git remote add origin https://github.com/vls2693/common_calculator.git 2>/dev/null || \
@@ -60,6 +61,8 @@ flask --app app run --port 5001
    ```
 
    `git reset --hard` заменит файлы приложения версией из GitHub. Это единственный раз, когда команды нужно выполнять вручную.
+
+   Если появляется `git: command not found`, значит git не попал в `PATH` этой консоли. Он установлен в `/usr/bin/git`, поэтому помогает строка `export PATH="/usr/bin:/bin:$PATH"` в начале блока. Сам деплой этого не требует: приложение вызывает `/usr/bin/git` напрямую.
 
 3. **Проверьте WSGI-файл.** На вкладке **Web** откройте ссылку **WSGI configuration file**. Содержимое должно быть таким:
 

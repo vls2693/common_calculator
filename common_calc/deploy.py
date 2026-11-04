@@ -10,6 +10,7 @@ GitHub Actions после успешных тестов вызывает ``POST 
 import hmac
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -27,6 +28,10 @@ RELOAD_DELAY_SECONDS = 2
 OUTPUT_LIMIT = 2000
 
 _deploy_lock = threading.Lock()
+
+# В консолях PythonAnywhere git иногда отсутствует в PATH, но он есть
+# в /usr/bin. Веб-приложение не должно зависеть от настроек .bashrc.
+GIT = shutil.which("git") or "/usr/bin/git"
 
 
 def _env(name, default=""):
@@ -57,7 +62,7 @@ def current_revision():
     """Текущий коммит рабочей копии или пустая строка."""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [GIT, "rev-parse", "HEAD"],
             cwd=PROJECT_DIR,
             capture_output=True,
             text=True,
@@ -143,14 +148,14 @@ def run_deploy(commit=""):
         repo_url = _env("DEPLOY_REPO_URL", DEFAULT_REPO_URL)
         old_rev = current_revision()
 
-        remote = _run(["git", "remote", "get-url", "origin"], 15)
+        remote = _run([GIT, "remote", "get-url", "origin"], 15)
         if remote.returncode == 0:
-            _run(["git", "remote", "set-url", "origin", repo_url], 15)
+            _run([GIT, "remote", "set-url", "origin", repo_url], 15)
         else:
-            _run(["git", "remote", "add", "origin", repo_url], 15)
+            _run([GIT, "remote", "add", "origin", repo_url], 15)
 
         fetch = _run(
-            ["git", "fetch", "--depth=1", "origin", target or "main"],
+            [GIT, "fetch", "--depth=1", "origin", target or "main"],
             FETCH_TIMEOUT_SECONDS,
         )
         if fetch.returncode != 0:
@@ -161,7 +166,7 @@ def run_deploy(commit=""):
             }
 
         reset = _run(
-            ["git", "reset", "--hard", "FETCH_HEAD"], FETCH_TIMEOUT_SECONDS
+            [GIT, "reset", "--hard", "FETCH_HEAD"], FETCH_TIMEOUT_SECONDS
         )
         if reset.returncode != 0:
             return {
@@ -175,7 +180,7 @@ def run_deploy(commit=""):
         if old_rev:
             diff = _run(
                 [
-                    "git",
+                    GIT,
                     "diff",
                     "--quiet",
                     old_rev,
