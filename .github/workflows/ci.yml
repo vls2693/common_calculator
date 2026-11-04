@@ -44,14 +44,54 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Deploy
         env:
-          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
-          PA_USERNAME: ${{ vars.PA_USERNAME || 'vls2693' }}
-          PA_DOMAIN: ${{ vars.PA_DOMAIN || 'vls2693.pythonanywhere.com' }}
-          PA_PROJECT_DIR: ${{ vars.PA_PROJECT_DIR || '/home/vls2693/common_calculator' }}
-          PA_VENV: ${{ vars.PA_VENV || '/home/vls2693/.virtualenvs/myenv' }}
-        run: python3 .github/scripts/deploy_pythonanywhere.py
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          DEPLOY_URL: https://vls2693.pythonanywhere.com
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DEPLOY_TOKEN" ]; then
+            echo "::warning::Секрет DEPLOY_TOKEN не задан — деплой пропущен."
+            exit 0
+          fi
+
+          health=$(curl -fsS --max-time 30 "$DEPLOY_URL/health" || true)
+          case "$health" in
+            *'"commit"'*) ;;
+            *)
+              echo "::warning::На сервере ещё нет /health. Выполните первичную настройку из README."
+              exit 0
+              ;;
+          esac
+
+          response=$(curl -sS --max-time 900 -w '\n%{http_code}' \
+            -X POST \
+            -H "X-Deploy-Token: $DEPLOY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"commit\": \"$EXPECTED_SHA\"}" \
+            "$DEPLOY_URL/deploy")
+          code=${response##*$'\n'}
+          body=${response%$'\n'*}
+          echo "$body"
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Деплой вернул HTTP $code."
+            exit 1
+          fi
+
+          for attempt in $(seq 1 30); do
+            current=$(curl -fsS --max-time 15 "$DEPLOY_URL/health" \
+              | python3 -c 'import json, sys; print(json.load(sys.stdin).get("commit", ""))' \
+              || true)
+            if [ "$current" = "$EXPECTED_SHA" ]; then
+              echo "Сайт обновлён до $EXPECTED_SHA."
+              exit 0
+            fi
+            echo "Ожидаю перезагрузку: $current (попытка $attempt)"
+            sleep 5
+          done
+
+          echo "::error::Сайт не обновился до $EXPECTED_SHA."
+          exit 1

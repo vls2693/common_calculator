@@ -1,8 +1,11 @@
+import os
 import unittest
+from unittest import mock
 
 from werkzeug.datastructures import MultiDict
 
 from app import app
+from common_calc import deploy as deploy_module
 from common_calc.base import receiver
 from common_calc.errors import CalculationError
 
@@ -93,6 +96,89 @@ class CalculatorAppTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 405)
         self.assertIn("Метод не поддерживается", response.get_data(as_text=True))
+
+
+class DeployEndpointTestCase(unittest.TestCase):
+    def setUp(self):
+        self.client = app.test_client()
+        environment = mock.patch.dict(
+            os.environ,
+            {
+                "DEPLOY_TOKEN": "test-token",
+                "DEPLOY_TOKEN_FILE": "/nonexistent/deploy-token",
+            },
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def test_health_reports_commit(self):
+        response = self.client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "ok")
+        self.assertIn("commit", response.get_json())
+
+    def test_deploy_without_token_is_hidden(self):
+        response = self.client.post("/deploy")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_deploy_with_wrong_token_is_hidden(self):
+        response = self.client.post(
+            "/deploy", headers={"X-Deploy-Token": "wrong"}
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_deploy_with_token_starts_deploy(self):
+        result = {"ok": True, "new": "abc123"}
+
+        with mock.patch.object(
+            deploy_module, "run_deploy", return_value=result
+        ) as run_deploy:
+            response = self.client.post(
+                "/deploy", headers={"X-Deploy-Token": "test-token"}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), result)
+        run_deploy.assert_called_once_with(commit="")
+
+    def test_deploy_passes_commit_from_body(self):
+        sha = "a" * 40
+        result = {"ok": True, "new": sha}
+
+        with mock.patch.object(
+            deploy_module, "run_deploy", return_value=result
+        ) as run_deploy:
+            response = self.client.post(
+                "/deploy",
+                headers={"X-Deploy-Token": "test-token"},
+                json={"commit": sha},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        run_deploy.assert_called_once_with(commit=sha)
+
+    def test_failed_deploy_returns_500(self):
+        result = {"ok": False, "step": "fetch", "detail": "boom"}
+
+        with mock.patch.object(
+            deploy_module, "run_deploy", return_value=result
+        ) as run_deploy:
+            response = self.client.post(
+                "/deploy", headers={"X-Deploy-Token": "test-token"}
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json(), result)
+        run_deploy.assert_called_once_with(commit="")
+
+    def test_invalid_commit_is_rejected(self):
+        result = deploy_module.run_deploy(commit="not-a-sha")
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["step"], "commit")
 
 
 class ReceiverTestCase(unittest.TestCase):

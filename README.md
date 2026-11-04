@@ -23,28 +23,45 @@ flask --app app run --port 5001
 
 Сайт: **https://vls2693.pythonanywhere.com**
 
-Автодеплой работает так:
+У PythonAnywhere нет GitHub-интеграции как у Heroku, на бесплатном плане нет SSH, а API консолей принимает команды только в консоль, которую хотя бы раз открыли в браузере (и она закрывается через день-два). Поэтому деплой идёт через защищённый эндпоинт самого приложения.
+
+Как это работает:
 
 1. Push в `main` запускает GitHub Actions.
 2. Сначала выполняются тесты.
-3. Если тесты прошли, workflow через официальный PythonAnywhere API создаёт временную Bash-консоль на сервере.
-4. Если каталог ещё не git-репозиторий, он инициализируется автоматически. Затем `git fetch` + `git reset --hard FETCH_HEAD`. Если `requirements.txt` изменился, зависимости обновляются.
-5. Веб-приложение перезагружается через API, временная консоль удаляется.
+3. Если тесты прошли, workflow отправляет `POST /deploy` на сайт с секретным токеном.
+4. Приложение делает `git fetch` + `git reset --hard FETCH_HEAD`. Если `requirements.txt` изменился, ставит зависимости.
+5. Через пару секунд приложение перезагружается, а workflow опрашивает `GET /health`, пока сайт не начнёт отдавать новый коммит.
 
-У PythonAnywhere нет GitHub-интеграции как у Heroku, а на бесплатном плане нет SSH, поэтому используется API-токен. Токен хранится в GitHub Secrets и его можно отозвать в любой момент.
+`/deploy` без правильного токена отвечает `404`, `/health` показывает только хеш коммита. Токен хранится в `/home/vls2693/.common_calc_deploy_token` (вне репозитория, права `600`) и в GitHub Secrets. В самом репозитории токена нет.
 
 ### Одноразовая настройка
 
-1. **Создайте API-токен.** PythonAnywhere → **Account** → **API Token** → **Generate**. Скопируйте токен.
-2. **Добавьте токен в GitHub.** Репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Имя: `PYTHONANYWHERE_API_TOKEN`.
-3. **Проверьте пути.** На PythonAnywhere откройте **Web** и сверьте:
-   - **Source code** — `/home/vls2693/common_calculator`;
-   - **Virtualenv** — `/home/vls2693/.virtualenvs/myenv`;
-   - **Python version** — 3.10.
+1. **Сгенерируйте токен.** В любом терминале:
 
-   Это значения по умолчанию в workflow и в скрипте деплоя. Если у вас другие пути, создайте переменные репозитория (**Settings → Secrets and variables → Actions → Variables**): `PA_PROJECT_DIR` и `PA_VENV`. Дополнительно можно задать `PA_DOMAIN`, `PA_USERNAME` и `PA_REPO_URL`.
-4. **Первый деплой подготовит git сам.** Вручную ничего создавать не нужно: если в каталоге из **Source code** ещё нет git-репозитория, скрипт выполнит `git init`, добавит remote, скачает `main` и сделает `git reset --hard`. Единственное требование — в каталоге уже лежит `app.py` (это защита от деплоя не туда), а файлы приложения будут заменены версией из GitHub.
-5. **Проверьте WSGI-файл.** Если сайт уже открывался со старой версией, скорее всего всё настроено. Иначе на вкладке **Web** откройте ссылку **WSGI configuration file** и приведите содержимое к виду:
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+   Скопируйте значение — оно понадобится дважды.
+
+2. **Подготовьте код на сервере.** PythonAnywhere → **Consoles** → **Bash**. Выполните команды, подставив свой токен:
+
+   ```bash
+   cd /home/vls2693/common_calculator
+   git init -q
+   git remote add origin https://github.com/vls2693/common_calculator.git 2>/dev/null || \
+     git remote set-url origin https://github.com/vls2693/common_calculator.git
+   git fetch --depth=1 origin main
+   git reset --hard FETCH_HEAD
+   /home/vls2693/.virtualenvs/myenv/bin/pip install -r requirements.txt
+   echo 'ВАШ_ТОКЕН' > /home/vls2693/.common_calc_deploy_token
+   chmod 600 /home/vls2693/.common_calc_deploy_token
+   ```
+
+   `git reset --hard` заменит файлы приложения версией из GitHub. Это единственный раз, когда команды нужно выполнять вручную.
+
+3. **Проверьте WSGI-файл.** На вкладке **Web** откройте ссылку **WSGI configuration file**. Содержимое должно быть таким:
 
    ```python
    import sys
@@ -56,8 +73,11 @@ flask --app app run --port 5001
    from wsgi import application
    ```
 
-   Сохраните файл. Зависимости в `/home/vls2693/.virtualenvs/myenv` первый деплой установит сам, потому что `requirements.txt` изменился.
-6. **Запустите деплой.** GitHub → **Actions** → **CI** → **Run workflow** (ветка `main`). Дождитесь зелёного джоба **Deploy to PythonAnywhere** и откройте https://vls2693.pythonanywhere.com. После этого каждый push в `main` будет деплоиться автоматически.
+   Там же сверьте **Source code** (`/home/vls2693/common_calculator`), **Virtualenv** (`/home/vls2693/.virtualenvs/myenv`) и **Python version** (3.10). Нажмите **Reload**.
+
+4. **Добавьте секрет в GitHub.** Репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Имя: `DEPLOY_TOKEN`, значение — токен из шага 1. Секрет `PYTHONANYWHERE_API_TOKEN` больше не нужен, его можно удалить.
+
+5. **Запустите деплой.** GitHub → **Actions** → **CI** → **Run workflow** (ветка `main`). Дождитесь зелёного джоба **Deploy to PythonAnywhere** и откройте https://vls2693.pythonanywhere.com. После этого каждый push в `main` деплоится автоматически.
 
 ### Ручной запуск деплоя
 
@@ -73,17 +93,22 @@ flask --app app run --port 5001
 4. Справа нажмите кнопку **Run workflow** (она с выпадающим списком).
 5. В списке веток выберите **main** и нажмите зелёную кнопку **Run workflow**.
 6. Обновите страницу — сверху появится новый запуск с жёлтой точкой. Дождитесь зелёной галочки.
-7. Откройте запуск и джоб **Deploy to PythonAnywhere** → шаг **Deploy**. В логе должно быть `Деплой в vls2693.pythonanywhere.com` и `Деплой на PythonAnywhere завершён успешно.`
+7. Откройте запуск и джоб **Deploy to PythonAnywhere** → шаг **Deploy**. В логе должно быть `Сайт обновлён до <хеш коммита>.`
 
 Если кнопки **Run workflow** нет: проверьте, что workflow-файл есть в ветке `main`, и что в **Settings → Actions → General** разрешён запуск Actions.
 
-Если джоб **Deploy to PythonAnywhere** упал с `401`, значит токен в секрете неверный или отозван — сгенерируйте новый в PythonAnywhere (Account → API Token) и обновите секрет `PYTHONANYWHERE_API_TOKEN`.
+### Если деплой не сработал
+
+- Джоб зелёный, но в логе предупреждение `На сервере ещё нет /health` — не выполнен шаг 2, код на сервере ещё старый.
+- `Деплой вернул HTTP 404` — токен в GitHub Secrets не совпадает с файлом `/home/vls2693/.common_calc_deploy_token`.
+- `Деплой вернул HTTP 500` — в ответе будет шаг (`fetch`, `reset` или `pip`) и текст ошибки. Ошибка `fetch` обычно означает, что сервер не смог достучаться до GitHub.
+- `Сайт не обновился до ...` — код обновился, но приложение не перезагрузилось. Нажмите **Reload** на вкладке **Web** и проверьте error log.
 
 ### Ограничения бесплатного плана
 
 - 100 CPU-секунд в день. Поэтому зависимости переустанавливаются только при изменении `requirements.txt`.
 - Веб-приложение нужно периодически продлевать на вкладке **Web**.
-- SSH недоступен, поэтому используется API-токен.
+- SSH недоступен, поэтому используется собственный защищённый эндпоинт деплоя.
 
 ## Возможности
 

@@ -2,9 +2,10 @@ import logging
 import math
 from itertools import zip_longest
 
-from flask import Flask, render_template, request
+from flask import Flask, abort, render_template, request
 from werkzeug.exceptions import HTTPException
 
+from common_calc import deploy as deploy_module
 from common_calc.base import receiver
 from common_calc.errors import CalculationError
 
@@ -12,6 +13,8 @@ app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024  # 1 МБ более чем достаточно
 app.logger.setLevel(logging.INFO)
+
+APP_COMMIT = deploy_module.current_revision()
 
 HTTP_ERRORS = {
     400: (
@@ -114,6 +117,32 @@ def index():
         overpays=overpays,
         transactions=transactions,
     )
+
+
+@app.route("/health")
+def health():
+    return {"status": "ok", "commit": APP_COMMIT}
+
+
+@app.route("/deploy", methods=["POST"])
+def deploy_endpoint():
+    if not deploy_module.token_matches(
+        request.headers.get("X-Deploy-Token", "")
+    ):
+        abort(404)
+
+    payload = request.get_json(silent=True)
+    commit = ""
+    if isinstance(payload, dict) and isinstance(payload.get("commit"), str):
+        commit = payload["commit"]
+
+    result = deploy_module.run_deploy(commit=commit)
+    app.logger.info(
+        "Деплой из GitHub: %s -> %s",
+        result.get("old", ""),
+        result.get("new", ""),
+    )
+    return result, 200 if result.get("ok") else 500
 
 
 @app.errorhandler(HTTPException)
